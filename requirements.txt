@@ -1,0 +1,7 @@
+streamlit
+openai
+requests
+PyJWT
+python-dotenv
+Pillow
+aiohttp 
