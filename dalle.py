@@ -5,6 +5,9 @@ import os
 
 class DalleAPI:
     def __init__(self, org_id=None, api_key=None):
+        if not org_id or not api_key:
+            raise ValueError("OpenAI API 키가 설정되지 않았습니다.")
+            
         self.client = OpenAI(
             organization=org_id,
             api_key=api_key
