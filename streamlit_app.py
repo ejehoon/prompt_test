@@ -2,9 +2,24 @@ import streamlit as st
 import asyncio
 import requests
 import time
+from dotenv import load_dotenv
 import os
 from openai import OpenAI
 import jwt
+
+# 환경 변수 로드
+load_dotenv()
+
+# 세션 상태 초기화
+if 'api_keys' not in st.session_state:
+    st.session_state.api_keys = {
+        'OPENAI_ORG': '',
+        'OPENAI_API_KEY': '',
+        'KLING_ACCESS_KEY': '',
+        'KLING_SECRET_KEY': ''
+    }
+if 'apis_initialized' not in st.session_state:
+    st.session_state.apis_initialized = False
 
 # OpenAI API 클래스
 class DalleAPI:
@@ -96,25 +111,10 @@ class KlingAPI:
             st.error(f"Kling AI 이미지 생성 오류: {str(e)}")
             return "Kling AI", None
 
-# API 클래스 초기화
-dalle_api = DalleAPI(
-    org_id=st.secrets["openai_api"]["org"],
-    api_key=st.secrets["openai_api"]["key"]
-)
-kling_api = KlingAPI(
-    access_key=st.secrets["kling_api"]["access_key"],
-    secret_key=st.secrets["kling_api"]["secret_key"]
-)
-
-def main():
-    # 페이지 설정
-    st.set_page_config(
-        page_title="AI 이미지 생성 비교",
-        layout="wide"
-    )
-
-    # 사이드바 설정
+# API 키 입력 폼
+def show_api_key_form():
     with st.sidebar:
+        # 모델 선택 섹션
         st.title("AI 모델 선택")
         st.write("테스트할 AI 모델을 선택하세요")
         
@@ -128,8 +128,95 @@ def main():
         }
         
         st.divider()
+
+        # API 키 설정 섹션 (expander 사용)
+        with st.expander("🔑 API 키 설정"):
+            # OpenAI API 키 입력
+            st.subheader("OpenAI API")
+            openai_org = st.text_input(
+                "Organization ID:",
+                value=st.session_state.api_keys['OPENAI_ORG'],
+                type="password",
+                help="OpenAI Organization ID를 입력하세요"
+            )
+            openai_key = st.text_input(
+                "API Key:",
+                value=st.session_state.api_keys['OPENAI_API_KEY'],
+                type="password",
+                help="OpenAI API Key를 입력하세요"
+            )
+            
+            st.divider()
+            
+            # Kling API 키 입력
+            st.subheader("Kling API")
+            kling_access = st.text_input(
+                "Access Key:",
+                value=st.session_state.api_keys['KLING_ACCESS_KEY'],
+                type="password",
+                help="Kling Access Key를 입력하세요"
+            )
+            kling_secret = st.text_input(
+                "Secret Key:",
+                value=st.session_state.api_keys['KLING_SECRET_KEY'],
+                type="password",
+                help="Kling Secret Key를 입력하세요"
+            )
+            
+            # 적용 버튼
+            if st.button("API 키 적용", use_container_width=True):
+                if all([openai_org, openai_key, kling_access, kling_secret]):
+                    st.session_state.api_keys.update({
+                        'OPENAI_ORG': openai_org,
+                        'OPENAI_API_KEY': openai_key,
+                        'KLING_ACCESS_KEY': kling_access,
+                        'KLING_SECRET_KEY': kling_secret
+                    })
+                    st.session_state.apis_initialized = True
+                    st.success("✅ API 키가 적용되었습니다!")
+                else:
+                    st.error("❌ 모든 API 키를 입력해주세요.")
+        
+        st.divider()
         st.subheader("⚙️ 설정")
         st.info("미구현.(현재 16:9로 1792:1024 비율로 생성)")
+
+        return models  # 선택된 모델 반환
+
+# API 클래스 초기화 함수
+def initialize_apis():
+    if not st.session_state.apis_initialized:
+        st.warning("API 키를 입력하고 적용해주세요.")
+        st.stop()
+        
+    return (
+        DalleAPI(
+            org_id=st.session_state.api_keys['OPENAI_ORG'],
+            api_key=st.session_state.api_keys['OPENAI_API_KEY']
+        ),
+        KlingAPI(
+            access_key=st.session_state.api_keys['KLING_ACCESS_KEY'],
+            secret_key=st.session_state.api_keys['KLING_SECRET_KEY']
+        )
+    )
+
+def main():
+    # 페이지 설정
+    st.set_page_config(
+        page_title="AI 이미지 생성 비교",
+        layout="wide"
+    )
+
+    # API 키 입력 폼 표시 (사이드바에 모든 UI 포함)
+    models = show_api_key_form()  # 선택된 모델 받기
+
+    # API 키가 설정되지 않았으면 여기서 중단
+    if not st.session_state.apis_initialized:
+        st.info("👈 사이드바의 'API 키 설정'에서 API 키를 설정해주세요.")
+        return
+
+    # API 클래스 초기화
+    dalle_api, kling_api = initialize_apis()
 
     # 메인 영역
     st.title("AI 이미지 생성 비교")
